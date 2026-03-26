@@ -82,6 +82,49 @@ async function fetchPage(url: string, signal: AbortSignal): Promise<string | nul
   }
 }
 
+/** Extract sold listings from the completed-auctions table */
+function extractSoldListings(html: string): PriceEntry[] {
+  const entries: PriceEntry[] = [];
+
+  // Match each <tr> row in the sold listings table
+  // Each row: <td class="date">DATE</td> ... <td class="title">TITLE [SOURCE]</td> ... <span class="js-price">$PRICE</span>
+  const rowRegex = /<tr[^>]*>\s*<td class="date">(\d{4}-\d{2}-\d{2})<\/td>[\s\S]*?<td class="title"[^>]*>([\s\S]*?)<\/td>[\s\S]*?<span class="js-price"[^>]*>\$([0-9,.]+)<\/span>/g;
+
+  let match;
+  while ((match = rowRegex.exec(html)) !== null && entries.length < 15) {
+    const date = match[1];
+    const titleBlock = match[2];
+    const price = parseFloat(match[3].replace(",", ""));
+    if (isNaN(price) || price <= 0) continue;
+
+    // Determine source and extract URL
+    const isTcgplayer = titleBlock.includes("[TCGPlayer]");
+    const isEbay = titleBlock.includes("[eBay]");
+    const source = isTcgplayer ? "TCGPlayer" : isEbay ? "eBay" : "Other";
+
+    // Extract link URL if present
+    let url: string | undefined;
+    const linkMatch = titleBlock.match(/href="([^"]+)"/);
+    if (linkMatch) {
+      // TCGPlayer links go through partner redirect — extract the actual URL
+      const rawUrl = linkMatch[1].replace(/&amp;/g, "&");
+      const uParam = rawUrl.match(/[?&]u=([^&]+)/);
+      url = uParam ? decodeURIComponent(uParam[1]) : rawUrl;
+    }
+
+    entries.push({
+      source: "pricecharting",
+      price,
+      condition: `Ungraded · ${source}`,
+      date: `${date}T00:00:00Z`,
+      type: "sold",
+      url,
+    });
+  }
+
+  return entries;
+}
+
 function extractPricesFromHtml(
   html: string,
   pageUrl: string
@@ -124,6 +167,10 @@ function extractPricesFromHtml(
       url: pageUrl,
     });
   }
+
+  // Extract individual sold listings
+  const soldListings = extractSoldListings(html);
+  entries.push(...soldListings);
 
   const priceHistory = extractPriceHistory(html);
 
