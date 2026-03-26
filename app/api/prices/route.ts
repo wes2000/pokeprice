@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
   const [tcgPrices, ebayPrices, pcResult] = await Promise.all([
     fetchTcgplayerPrices(cardId),
     fetchEbayPrices(cardName, setName, cardNumber),
-    fetchPriceChartingPrices(cardName, setName),
+    fetchPriceChartingPrices(cardName, setName, cardNumber),
   ]);
 
   const allPrices = [...tcgPrices, ...ebayPrices, ...pcResult.entries];
