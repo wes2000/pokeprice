@@ -127,10 +127,30 @@ body {
 }
 
 /* Result */
-.result {
+.result-wrapper {
   max-width: 900px;
   margin: 0 auto;
   padding: 0 24px 64px;
+}
+
+.result-heading {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.result-heading__name {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.result-heading__meta {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.result {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 32px;

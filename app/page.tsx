@@ -96,7 +96,11 @@ export default function Home() {
       )}
 
       {view === "card" && loading && (
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px" }}>
+        <div className="result-wrapper">
+          <div className="result-heading">
+            <div className="skeleton" style={{ height: 36, width: 240, margin: "0 auto", borderRadius: 8 }} />
+            <div className="skeleton" style={{ height: 16, width: 180, margin: "8px auto 0", borderRadius: 4 }} />
+          </div>
           <div className="result">
             <div className="skeleton" style={{ width: 200, height: 280 }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1 }}>

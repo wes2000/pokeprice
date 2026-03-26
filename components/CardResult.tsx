@@ -19,9 +19,14 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
   const ebayListings = data.prices.filter((p) => p.source === "ebay");
 
   return (
-    <div className="result">
-      <img className="result__image" src={data.imageUrl} alt={data.cardName} />
-      <div className="result__prices">
+    <div className="result-wrapper">
+      <div className="result-heading">
+        <h1 className="result-heading__name">{data.cardName}</h1>
+        <div className="result-heading__meta">{data.setName} · {data.cardNumber} · {data.rarity}</div>
+      </div>
+      <div className="result">
+        <img className="result__image" src={data.imageUrl} alt={data.cardName} />
+        <div className="result__prices">
         <SuperGuess data={data.superGuess} onRefresh={onRefresh} refreshing={refreshing} />
 
         {data.priceHistory && data.priceHistory.length >= 2 && (
@@ -66,6 +71,7 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
