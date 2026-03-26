@@ -1,7 +1,9 @@
 import { PriceEntry } from "../types";
 
-const EBAY_AUTH_URL = "https://api.ebay.com/identity/v1/oauth2/token";
-const EBAY_SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search";
+const IS_SANDBOX = process.env.EBAY_SANDBOX === "true";
+const EBAY_BASE = IS_SANDBOX ? "https://api.sandbox.ebay.com" : "https://api.ebay.com";
+const EBAY_AUTH_URL = `${EBAY_BASE}/identity/v1/oauth2/token`;
+const EBAY_SEARCH_URL = `${EBAY_BASE}/buy/browse/v1/item_summary/search`;
 const TIMEOUT_MS = 5000;
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
