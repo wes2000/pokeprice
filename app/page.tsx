@@ -1,66 +1,96 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+// app/page.tsx
+"use client";
+
+import { useState, useCallback } from "react";
+import { CardSearchResult, PriceResult } from "@/lib/types";
+import SearchBar from "@/components/SearchBar";
+import CardResult from "@/components/CardResult";
+import RecentSearches, { addRecentSearch } from "@/components/RecentSearches";
 
 export default function Home() {
+  const [priceData, setPriceData] = useState<PriceResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPrices = useCallback(async (cardId: string) => {
+    setLoading(true);
+    setError(null);
+    setPriceData(null); // Clear previous result so skeleton shows
+    try {
+      const res = await fetch(`/api/prices?cardId=${encodeURIComponent(cardId)}`);
+      if (!res.ok) throw new Error("Failed to fetch prices");
+      const data: PriceResult = await res.json();
+      setPriceData(data);
+
+      addRecentSearch({
+        cardId: data.cardId,
+        name: data.cardName,
+        setName: data.setName,
+        number: data.cardNumber,
+        imageUrl: data.imageUrl,
+        lastPrice: data.superGuess.estimate,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      setError("Failed to load pricing data. Please try again.");
+      setPriceData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    if (!priceData) return;
+    setRefreshing(true);
+    try {
+      const res = await fetch(`/api/refresh?cardId=${encodeURIComponent(priceData.cardId)}`);
+      const data: PriceResult = await res.json();
+      setPriceData(data);
+    } catch { /* keep existing data */ } finally {
+      setRefreshing(false);
+    }
+  }, [priceData]);
+
+  const handleCardSelect = useCallback((card: CardSearchResult) => {
+    fetchPrices(card.id);
+  }, [fetchPrices]);
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      <header className="header">
+        <div className="header__logo">POKEPRICE</div>
+        <div className="header__attribution">
+          Data from eBay · TCGplayer · PriceCharting
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <SearchBar onSelect={handleCardSelect} />
+
+      {loading && (
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px" }}>
+          <div className="result">
+            <div className="skeleton" style={{ width: 200, height: 280 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1 }}>
+              <div className="skeleton" style={{ height: 120 }} />
+              <div className="skeleton" style={{ height: 64 }} />
+              <div className="skeleton" style={{ height: 64 }} />
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+      )}
+
+      {error && !loading && (
+        <div style={{ maxWidth: 600, margin: "32px auto", padding: "24px", textAlign: "center", color: "#e0e0e0", background: "#12121a", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8 }}>
+          {error}
+        </div>
+      )}
+
+      {priceData && !loading && (
+        <CardResult data={priceData} onRefresh={handleRefresh} refreshing={refreshing} />
+      )}
+
+      <RecentSearches onSelect={handleCardSelect} />
+    </>
   );
 }
