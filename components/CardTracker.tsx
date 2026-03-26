@@ -21,7 +21,6 @@ const TRACKER_EVENT = "pokeprice-tracker-updated";
 export function addTrackedCard(card: TrackedCard) {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") as TrackedCard[];
-    if (stored.some((c) => c.cardId === card.cardId)) return; // no duplicates
     const updated = [...stored, card];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     window.dispatchEvent(new Event(TRACKER_EVENT));
@@ -42,8 +41,8 @@ export function formatCardRow(card: TrackedCard): string {
     "",
     `${card.name} - ${card.number}`,
     card.rarity,
-    card.tcgplayerUrl || "",
-    card.pricechartingUrl || "",
+    card.tcgplayerUrl ? `=HYPERLINK("${card.tcgplayerUrl}","TCGPlayer Link")` : "",
+    card.pricechartingUrl ? `=HYPERLINK("${card.pricechartingUrl}","PriceCharting Link")` : "",
   ].join("\t");
 }
 
