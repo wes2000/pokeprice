@@ -28,9 +28,7 @@ async function getAccessToken(): Promise<string | null> {
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: `grant_type=client_credentials&scope=${encodeURIComponent(
-      IS_SANDBOX
-        ? "https://api.ebay.com/oauth/api_scope"
-        : "https://api.ebay.com/oauth/api_scope/buy.browse"
+      "https://api.ebay.com/oauth/api_scope"
     )}`,
   });
 
