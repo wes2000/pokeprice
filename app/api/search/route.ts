@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CardSearchResult } from "@/lib/types";
+import { getCachedSearch, setCachedSearch } from "@/lib/cache";
 
 const POKEMON_TCG_API = "https://api.pokemontcg.io/v2";
 
@@ -7,7 +8,6 @@ function buildSearchQuery(raw: string): string {
   const parts: string[] = [];
   let remaining = raw.trim();
 
-  // Extract card number pattern (e.g., "193/182", "4/102")
   const numberMatch = remaining.match(/(\d+\/\d+)/);
   if (numberMatch) {
     const num = numberMatch[1].split("/")[0];
@@ -32,24 +32,32 @@ function buildSearchQuery(raw: string): string {
   return parts.join(" ");
 }
 
+interface SearchResponse {
+  results: CardSearchResult[];
+  sets: { id: string; name: string; series: string; releaseDate: string; total: number; logoUrl: string }[];
+}
+
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q");
   if (!q || q.length < 2) {
     return NextResponse.json({ results: [], sets: [] });
   }
 
+  // Check cache first
+  const cached = await getCachedSearch<SearchResponse>(q);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
+
   try {
     const query = buildSearchQuery(q);
 
-    // Search cards and sets in parallel
     const [cardsRes, setsRes] = await Promise.all([
       fetch(
-        `${POKEMON_TCG_API}/cards?q=${encodeURIComponent(query)}&pageSize=8&select=id,name,set,number,rarity,images`,
-        { next: { revalidate: 60 } } as RequestInit
+        `${POKEMON_TCG_API}/cards?q=${encodeURIComponent(query)}&pageSize=8&select=id,name,set,number,rarity,images`
       ),
       fetch(
-        `${POKEMON_TCG_API}/sets?q=name:"${encodeURIComponent(q.trim().replace(/"/g, ""))}*"&orderBy=-releaseDate&pageSize=5`,
-        { next: { revalidate: 60 } } as RequestInit
+        `${POKEMON_TCG_API}/sets?q=name:"${encodeURIComponent(q.trim().replace(/"/g, ""))}*"&orderBy=-releaseDate&pageSize=5`
       ),
     ]);
 
@@ -68,7 +76,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const sets: { id: string; name: string; series: string; releaseDate: string; total: number; logoUrl: string }[] = [];
+    const sets: SearchResponse["sets"] = [];
     if (setsRes.ok) {
       const setsData = await setsRes.json();
       for (const s of setsData.data || []) {
@@ -83,7 +91,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ results, sets });
+    const response: SearchResponse = { results, sets };
+    await setCachedSearch(q, response);
+    return NextResponse.json(response);
   } catch {
     return NextResponse.json({ results: [], sets: [] }, { status: 500 });
   }

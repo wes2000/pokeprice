@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCachedSet, setCachedSet } from "@/lib/cache";
 
 const POKEMON_TCG_API = "https://api.pokemontcg.io/v2";
 
@@ -8,13 +9,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "setId required" }, { status: 400 });
   }
 
+  // Check cache first
+  const cached = await getCachedSet<{ set: unknown; cards: unknown[] }>(setId);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
+
   try {
-    // Fetch set info and all cards in parallel
     const [setRes, cardsRes] = await Promise.all([
-      fetch(`${POKEMON_TCG_API}/sets/${setId}`, { next: { revalidate: 3600 } } as RequestInit),
+      fetch(`${POKEMON_TCG_API}/sets/${setId}`),
       fetch(
-        `${POKEMON_TCG_API}/cards?q=set.id:${setId}&orderBy=number&pageSize=250&select=id,name,number,rarity,images,tcgplayer`,
-        { next: { revalidate: 3600 } } as RequestInit
+        `${POKEMON_TCG_API}/cards?q=set.id:${setId}&orderBy=number&pageSize=250&select=id,name,number,rarity,images,tcgplayer`
       ),
     ]);
 
@@ -37,7 +42,6 @@ export async function GET(req: NextRequest) {
     };
 
     const cards = (cardsData.data || []).map((card: Record<string, unknown>) => {
-      // Try to get a quick price from TCGplayer data embedded in the card
       let estimate: number | undefined;
       const tcg = card.tcgplayer as { prices?: Record<string, { market?: number }> } | undefined;
       if (tcg?.prices) {
@@ -58,7 +62,9 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json({ set: setInfo, cards });
+    const result = { set: setInfo, cards };
+    await setCachedSet(setId, result);
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: "Failed to fetch set" }, { status: 500 });
   }
