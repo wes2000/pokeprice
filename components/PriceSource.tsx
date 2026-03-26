@@ -50,11 +50,13 @@ export default function PriceSource({ name, meta, price, url, listings }: PriceS
 
       {expanded && hasListings && (
         <div className="price-source__listings" onClick={(e) => e.stopPropagation()}>
-          {listings.slice(0, 10).map((item, i) => (
-            <div key={i} className="price-source__listing-row">
+          {listings.slice(0, 15).map((item, i) => (
+            <div key={i} className={`price-source__listing-row ${item.type === "sold" ? "price-source__listing-row--sold" : ""}`}>
               <div className="price-source__listing-info">
+                <span className={`price-source__listing-badge price-source__listing-badge--${item.type}`}>
+                  {item.type === "sold" ? "SOLD" : "LISTED"}
+                </span>
                 <span className="price-source__listing-condition">{item.condition}</span>
-                <span className="price-source__listing-type">{item.type}</span>
               </div>
               <div className="price-source__listing-right">
                 <span className="price-source__listing-price">${item.price.toFixed(2)}</span>
