@@ -65,11 +65,19 @@ export function resetTokenCache(): void {
   cachedToken = null;
 }
 
+/** Resolve condition from Browse API item — condition can be string OR object */
 function resolveCondition(item: Record<string, unknown>): string {
-  // Browse API: condition can be a string or conditionId can be present
-  if (item.condition && typeof item.condition === "string" && item.condition !== "Unknown") {
-    return item.condition;
+  // condition might be a string like "New" or an object like {conditionId: "1000", conditionDisplayName: "New"}
+  const cond = item.condition;
+  if (typeof cond === "string" && cond && cond !== "Unknown") {
+    return cond;
   }
+  if (cond && typeof cond === "object") {
+    const obj = cond as Record<string, unknown>;
+    if (obj.conditionDisplayName) return String(obj.conditionDisplayName);
+    if (obj.conditionId) return CONDITION_MAP[String(obj.conditionId)] || String(obj.conditionId);
+  }
+  // Fallback to top-level conditionId
   if (item.conditionId) {
     return CONDITION_MAP[String(item.conditionId)] || String(item.conditionId);
   }
@@ -88,34 +96,39 @@ async function fetchActiveListings(
     q: query,
     filter: "buyingOptions:{FIXED_PRICE},conditions:{1000|1500|1750|2000|2500|3000}",
     sort: "price",
-    limit: "20",
+    limit: "10",
   });
 
-  const res = await fetch(`${EBAY_SEARCH_URL}?${params}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal: controller.signal,
-  });
-  clearTimeout(timeout);
+  try {
+    const res = await fetch(`${EBAY_SEARCH_URL}?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error(`[eBay] Browse search failed: ${res.status}`, body);
-    if (res.status === 401) cachedToken = null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[eBay] Browse search failed: ${res.status}`, body);
+      if (res.status === 401) cachedToken = null;
+      return [];
+    }
+
+    const data = await res.json();
+    if (!data.itemSummaries) return [];
+
+    console.log(`[eBay] Found ${data.itemSummaries.length} active listings`);
+    return data.itemSummaries.map((item: Record<string, unknown>) => ({
+      source: "ebay" as const,
+      price: parseFloat((item.price as { value: string }).value),
+      condition: resolveCondition(item),
+      date: (item.itemEndDate as string) || new Date().toISOString(),
+      type: "listed" as const,
+      url: item.itemWebUrl as string,
+    }));
+  } catch {
+    clearTimeout(timeout);
     return [];
   }
-
-  const data = await res.json();
-  if (!data.itemSummaries) return [];
-
-  console.log(`[eBay] Found ${data.itemSummaries.length} active listings for "${query}"`);
-  return data.itemSummaries.map((item: Record<string, unknown>) => ({
-    source: "ebay" as const,
-    price: parseFloat((item.price as { value: string }).value),
-    condition: resolveCondition(item),
-    date: (item.itemEndDate as string) || new Date().toISOString(),
-    type: "listed" as const,
-    url: item.itemWebUrl as string,
-  }));
 }
 
 /** Fetch recently sold items via Finding API (findCompletedItems) */
@@ -133,7 +146,7 @@ async function fetchSoldListings(query: string): Promise<PriceEntry[]> {
     "RESPONSE-DATA-FORMAT": "JSON",
     "REST-PAYLOAD": "",
     keywords: query,
-    "categoryId": "183454", // Pokemon TCG
+    "categoryId": "183454",
     "itemFilter(0).name": "SoldItemsOnly",
     "itemFilter(0).value": "true",
     "sortOrder": "EndTimeSoonest",
@@ -151,19 +164,34 @@ async function fetchSoldListings(query: string): Promise<PriceEntry[]> {
       return [];
     }
 
-    const data = await res.json();
-    const result = data.findCompletedItemsResponse?.[0];
-    const items = result?.searchResult?.[0]?.item;
+    const json = await res.json();
+    const response = json.findCompletedItemsResponse;
+    if (!response?.[0]) return [];
 
+    const ack = response[0].ack?.[0];
+    if (ack !== "Success") {
+      console.error(`[eBay] Finding API ack: ${ack}`, JSON.stringify(response[0].errorMessage || ""));
+      return [];
+    }
+
+    const items = response[0].searchResult?.[0]?.item;
     if (!items || items.length === 0) return [];
 
-    console.log(`[eBay] Found ${items.length} sold listings for "${query}"`);
+    console.log(`[eBay] Found ${items.length} sold listings`);
+
     return items.map((item: Record<string, unknown>) => {
-      const sellingStatus = item.sellingStatus as { currentPrice: { __value__: string }[] }[];
-      const priceVal = sellingStatus?.[0]?.currentPrice?.[0]?.["__value__"] || "0";
-      const condition = (item.condition as { conditionDisplayName: string[] }[])?.[0]?.conditionDisplayName?.[0] || "Unknown";
-      const endTime = (item.listingInfo as { endTime: string[] }[])?.[0]?.endTime?.[0] || new Date().toISOString();
-      const viewUrl = (item.viewItemURL as string[])?.[0] || "";
+      // Finding API nests everything in arrays
+      const sellingStatus = (item.sellingStatus as Record<string, unknown>[])?.[0];
+      const currentPrice = (sellingStatus?.currentPrice as Record<string, unknown>[])?.[0];
+      const priceVal = (currentPrice as { __value__?: string })?.__value__ || "0";
+
+      const conditionInfo = (item.condition as Record<string, unknown>[])?.[0];
+      const condition = ((conditionInfo?.conditionDisplayName as string[])?.[0]) || "Unknown";
+
+      const listingInfo = (item.listingInfo as Record<string, unknown>[])?.[0];
+      const endTime = ((listingInfo?.endTime as string[])?.[0]) || new Date().toISOString();
+
+      const viewUrl = ((item.viewItemURL as string[])?.[0]) || "";
 
       return {
         source: "ebay" as const,
@@ -175,6 +203,7 @@ async function fetchSoldListings(query: string): Promise<PriceEntry[]> {
       };
     }).filter((e: PriceEntry) => e.price > 0);
   } catch (err) {
+    clearTimeout(timeout);
     console.error("[eBay] Finding API error:", err);
     return [];
   }
@@ -195,6 +224,7 @@ export async function fetchEbayPrices(
       fetchSoldListings(query),
     ]);
 
+    // Sold first (priority), then active
     return [...sold, ...active];
   } catch (err) {
     console.error("[eBay] Unexpected error:", err);

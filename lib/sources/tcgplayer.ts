@@ -10,7 +10,21 @@ interface TcgplayerVariantPrices {
   market?: number;
 }
 
-export async function fetchTcgplayerPrices(cardId: string): Promise<PriceEntry[]> {
+export interface CardMetadata {
+  name: string;
+  setName: string;
+  cardNumber: string;
+  imageUrl: string;
+  rarity: string;
+}
+
+export interface TcgplayerResult {
+  prices: PriceEntry[];
+  metadata: CardMetadata | null;
+}
+
+/** Fetch TCGplayer prices AND card metadata in a single API call */
+export async function fetchTcgplayerPrices(cardId: string): Promise<TcgplayerResult> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -20,24 +34,36 @@ export async function fetchTcgplayerPrices(cardId: string): Promise<PriceEntry[]
     });
     clearTimeout(timeout);
 
-    if (!res.ok) return [];
+    if (!res.ok) return { prices: [], metadata: null };
 
     const json = await res.json();
-    const tcgplayer = json.data?.tcgplayer;
-    if (!tcgplayer?.prices) return [];
+    const card = json.data;
+    if (!card) return { prices: [], metadata: null };
+
+    // Extract metadata (saves a separate API call)
+    const metadata: CardMetadata = {
+      name: card.name || "",
+      setName: card.set?.name || "",
+      cardNumber: `${card.number}/${card.set?.printedTotal || "?"}`,
+      imageUrl: card.images?.small || "",
+      rarity: card.rarity || "Unknown",
+    };
+
+    const tcgplayer = card.tcgplayer;
+    if (!tcgplayer?.prices) return { prices: [], metadata };
 
     const entries: PriceEntry[] = [];
     const dateStr = tcgplayer.updatedAt
       ? new Date(tcgplayer.updatedAt).toISOString()
       : new Date().toISOString();
 
-    for (const [, variantPrices] of Object.entries(tcgplayer.prices)) {
+    for (const [variant, variantPrices] of Object.entries(tcgplayer.prices)) {
       const vp = variantPrices as TcgplayerVariantPrices;
       if (vp.market != null) {
         entries.push({
           source: "tcgplayer",
           price: vp.market,
-          condition: "Near Mint",
+          condition: variant === "normal" ? "Normal" : variant === "holofoil" ? "Holofoil" : variant === "reverseHolofoil" ? "Reverse Holo" : variant === "1stEditionHolofoil" ? "1st Ed Holo" : variant,
           date: dateStr,
           type: "market",
           url: tcgplayer.url,
@@ -45,8 +71,8 @@ export async function fetchTcgplayerPrices(cardId: string): Promise<PriceEntry[]
       }
     }
 
-    return entries;
+    return { prices: entries, metadata };
   } catch {
-    return [];
+    return { prices: [], metadata: null };
   }
 }

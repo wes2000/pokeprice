@@ -7,35 +7,28 @@ import { fetchEbayPrices } from "@/lib/sources/ebay";
 import { fetchPriceChartingPrices } from "@/lib/sources/pricecharting";
 import { PriceResult } from "@/lib/types";
 
-const POKEMON_TCG_API = "https://api.pokemontcg.io/v2/cards";
-
 export async function GET(req: NextRequest) {
   const cardId = req.nextUrl.searchParams.get("cardId");
   if (!cardId) {
     return NextResponse.json({ error: "cardId required" }, { status: 400 });
   }
 
-  let cardName = "", setName = "", cardNumber = "", imageUrl = "", rarity = "";
-  try {
-    const metaRes = await fetch(`${POKEMON_TCG_API}/${cardId}`);
-    if (metaRes.ok) {
-      const meta = await metaRes.json();
-      const card = meta.data;
-      cardName = card.name || "";
-      setName = card.set?.name || "";
-      cardNumber = `${card.number}/${card.set?.printedTotal || "?"}`;
-      imageUrl = card.images?.small || "";
-      rarity = card.rarity || "Unknown";
-    }
-  } catch {}
+  // Step 1: Fetch TCGplayer prices + card metadata in ONE call
+  const tcgResult = await fetchTcgplayerPrices(cardId);
+  const meta = tcgResult.metadata;
+  const cardName = meta?.name || "";
+  const setName = meta?.setName || "";
+  const cardNumber = meta?.cardNumber || "";
+  const imageUrl = meta?.imageUrl || "";
+  const rarity = meta?.rarity || "Unknown";
 
-  const [tcgPrices, ebayPrices, pcResult] = await Promise.all([
-    fetchTcgplayerPrices(cardId),
+  // Step 2: Fetch eBay + PriceCharting in parallel
+  const [ebayPrices, pcResult] = await Promise.all([
     fetchEbayPrices(cardName, setName, cardNumber),
     fetchPriceChartingPrices(cardName, setName, cardNumber),
   ]);
 
-  const allPrices = [...tcgPrices, ...ebayPrices, ...pcResult.entries];
+  const allPrices = [...tcgResult.prices, ...ebayPrices, ...pcResult.entries];
   const superGuess = calculateSuperGuess(allPrices);
   const sources = buildSourceSummary(allPrices);
 
