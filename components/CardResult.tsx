@@ -4,6 +4,7 @@
 import { PriceResult } from "@/lib/types";
 import SuperGuess from "./SuperGuess";
 import PriceSource from "./PriceSource";
+import PriceChart from "./PriceChart";
 
 interface CardResultProps {
   data: PriceResult;
@@ -12,12 +13,9 @@ interface CardResultProps {
 }
 
 export default function CardResult({ data, onRefresh, refreshing }: CardResultProps) {
-  // Extract first URL for each source from price entries
   const ebayUrl = data.prices.find((p) => p.source === "ebay")?.url;
   const tcgplayerUrl = data.prices.find((p) => p.source === "tcgplayer")?.url;
   const pricechartingUrl = data.prices.find((p) => p.source === "pricecharting")?.url;
-
-  // Get eBay listings for expandable view
   const ebayListings = data.prices.filter((p) => p.source === "ebay");
 
   return (
@@ -25,6 +23,10 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
       <img className="result__image" src={data.imageUrl} alt={data.cardName} />
       <div className="result__prices">
         <SuperGuess data={data.superGuess} onRefresh={onRefresh} refreshing={refreshing} />
+
+        {data.priceHistory && data.priceHistory.length >= 2 && (
+          <PriceChart data={data.priceHistory} />
+        )}
 
         {data.sources.ebay && (
           <PriceSource

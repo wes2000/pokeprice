@@ -6,17 +6,25 @@ import { CardSearchResult, PriceResult } from "@/lib/types";
 import SearchBar from "@/components/SearchBar";
 import CardResult from "@/components/CardResult";
 import RecentSearches, { addRecentSearch } from "@/components/RecentSearches";
+import SetBrowser from "@/components/SetBrowser";
+import PopularSets from "@/components/PopularSets";
+
+type View = "home" | "card" | "set";
 
 export default function Home() {
+  const [view, setView] = useState<View>("home");
   const [priceData, setPriceData] = useState<PriceResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeSetId, setActiveSetId] = useState<string | null>(null);
 
   const fetchPrices = useCallback(async (cardId: string) => {
+    setView("card");
     setLoading(true);
     setError(null);
-    setPriceData(null); // Clear previous result so skeleton shows
+    setPriceData(null);
+    setActiveSetId(null);
     try {
       const res = await fetch(`/api/prices?cardId=${encodeURIComponent(cardId)}`);
       if (!res.ok) throw new Error("Failed to fetch prices");
@@ -56,18 +64,38 @@ export default function Home() {
     fetchPrices(card.id);
   }, [fetchPrices]);
 
+  const handleSetSelect = useCallback((setId: string) => {
+    setView("set");
+    setActiveSetId(setId);
+    setPriceData(null);
+    setError(null);
+  }, []);
+
+  const handleBack = useCallback(() => {
+    setView("home");
+    setActiveSetId(null);
+    setPriceData(null);
+    setError(null);
+  }, []);
+
   return (
     <>
       <header className="header">
-        <div className="header__logo">POKEPRICE</div>
+        <button className="header__logo" onClick={handleBack} style={{ background: "none", border: "none", cursor: "pointer" }}>
+          POKEPRICE
+        </button>
         <div className="header__attribution">
           Data from eBay · TCGplayer · PriceCharting
         </div>
       </header>
 
-      <SearchBar onSelect={handleCardSelect} />
+      <SearchBar onSelect={handleCardSelect} onSetSelect={handleSetSelect} />
 
-      {loading && (
+      {view === "set" && activeSetId && (
+        <SetBrowser setId={activeSetId} onCardSelect={handleCardSelect} onBack={handleBack} />
+      )}
+
+      {view === "card" && loading && (
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 24px" }}>
           <div className="result">
             <div className="skeleton" style={{ width: 200, height: 280 }} />
@@ -80,17 +108,22 @@ export default function Home() {
         </div>
       )}
 
-      {error && !loading && (
+      {view === "card" && error && !loading && (
         <div style={{ maxWidth: 600, margin: "32px auto", padding: "24px", textAlign: "center", color: "#e0e0e0", background: "#12121a", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8 }}>
           {error}
         </div>
       )}
 
-      {priceData && !loading && (
+      {view === "card" && priceData && !loading && (
         <CardResult data={priceData} onRefresh={handleRefresh} refreshing={refreshing} />
       )}
 
-      <RecentSearches onSelect={handleCardSelect} />
+      {view === "home" && (
+        <>
+          <PopularSets onSetSelect={handleSetSelect} />
+          <RecentSearches onSelect={handleCardSelect} />
+        </>
+      )}
     </>
   );
 }

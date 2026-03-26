@@ -1,7 +1,7 @@
 import { PriceEntry } from "../types";
 
 const SEARCH_URL = "https://www.pricecharting.com/search-products";
-const TIMEOUT_MS = 5000;
+const TIMEOUT_MS = 8000;
 
 function extractPrice(html: string, id: string): number | null {
   const regex = new RegExp(
@@ -18,14 +18,36 @@ function extractCanonicalUrl(html: string): string | null {
   return match ? match[1] : null;
 }
 
+/** Extract historical price data from PriceCharting's embedded chart data */
+export function extractPriceHistory(html: string): { date: string; price: number }[] {
+  // PriceCharting embeds chart data in JavaScript — look for the price array
+  const chartMatch = html.match(/var\s+used_price\s*=\s*\[([^\]]+)\]/);
+  if (!chartMatch) return [];
+
+  const points: { date: string; price: number }[] = [];
+  // Format: [[Date.UTC(year,month,day), price], ...]
+  const entryRegex = /Date\.UTC\((\d+),(\d+),(\d+)\)\s*,\s*([\d.]+)/g;
+  let m;
+  while ((m = entryRegex.exec(chartMatch[1])) !== null) {
+    const year = parseInt(m[1]);
+    const month = parseInt(m[2]); // 0-indexed in JS
+    const day = parseInt(m[3]);
+    const price = parseFloat(m[4]);
+    if (!isNaN(price) && price > 0) {
+      const d = new Date(Date.UTC(year, month, day));
+      points.push({ date: d.toISOString().split("T")[0], price });
+    }
+  }
+  return points;
+}
+
 export async function fetchPriceChartingPrices(
   cardName: string,
   setName: string
-): Promise<PriceEntry[]> {
-  if (!cardName) return [];
+): Promise<{ entries: PriceEntry[]; priceHistory: { date: string; price: number }[] }> {
+  if (!cardName) return { entries: [], priceHistory: [] };
 
   try {
-    // Use PriceCharting's search to find the correct page
     const query = `${cardName} ${setName}`.trim();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -43,7 +65,7 @@ export async function fetchPriceChartingPrices(
     });
     clearTimeout(timeout);
 
-    if (!res.ok) return [];
+    if (!res.ok) return { entries: [], priceHistory: [] };
 
     const html = await res.text();
     const pageUrl = extractCanonicalUrl(html) || res.url;
@@ -74,8 +96,23 @@ export async function fetchPriceChartingPrices(
       });
     }
 
-    return entries;
+    // Also try to extract "new" (sealed/mint) price
+    const newPrice = extractPrice(html, "new_price");
+    if (newPrice != null) {
+      entries.push({
+        source: "pricecharting",
+        price: newPrice,
+        condition: "Graded 9-10",
+        date: now,
+        type: "market",
+        url: pageUrl,
+      });
+    }
+
+    const priceHistory = extractPriceHistory(html);
+
+    return { entries, priceHistory };
   } catch {
-    return [];
+    return { entries: [], priceHistory: [] };
   }
 }

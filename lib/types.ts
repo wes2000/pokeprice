@@ -13,6 +13,11 @@ export interface PriceEntry {
   url?: string;
 }
 
+export interface PriceHistoryPoint {
+  date: string; // YYYY-MM-DD
+  price: number;
+}
+
 export interface SourceSummary {
   ebay?: { low: number; high: number; avg: number; count: number; recentDays: number };
   tcgplayer?: { market: number; low: number; high: number };
@@ -36,6 +41,7 @@ export interface PriceResult {
   prices: PriceEntry[];
   superGuess: SuperGuessResult;
   sources: SourceSummary;
+  priceHistory?: PriceHistoryPoint[];
 }
 
 export interface CardSearchResult {
@@ -45,6 +51,25 @@ export interface CardSearchResult {
   number: string;
   rarity: string;
   imageUrl: string;
+}
+
+export interface SetInfo {
+  id: string;
+  name: string;
+  series: string;
+  releaseDate: string;
+  total: number;
+  logoUrl: string;
+  symbolUrl: string;
+}
+
+export interface SetCardEntry {
+  id: string;
+  name: string;
+  number: string;
+  imageUrl: string;
+  rarity: string;
+  superGuessEstimate?: number;
 }
 
 export interface RecentSearch {

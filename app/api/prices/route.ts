@@ -34,19 +34,20 @@ export async function GET(req: NextRequest) {
     }
   } catch {}
 
-  const [tcgPrices, ebayPrices, pcPrices] = await Promise.all([
+  const [tcgPrices, ebayPrices, pcResult] = await Promise.all([
     fetchTcgplayerPrices(cardId),
     fetchEbayPrices(cardName, setName, cardNumber),
     fetchPriceChartingPrices(cardName, setName),
   ]);
 
-  const allPrices = [...tcgPrices, ...ebayPrices, ...pcPrices];
+  const allPrices = [...tcgPrices, ...ebayPrices, ...pcResult.entries];
   const superGuess = calculateSuperGuess(allPrices);
   const sources = buildSourceSummary(allPrices);
 
   const result: PriceResult = {
     cardId, cardName, setName, cardNumber, imageUrl, rarity,
     prices: allPrices, superGuess, sources,
+    priceHistory: pcResult.priceHistory,
   };
 
   await setCachedPrices(cardId, result);
