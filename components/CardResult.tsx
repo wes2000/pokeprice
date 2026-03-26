@@ -26,30 +26,26 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
   const tcgplayerListings = data.prices.filter((p) => p.source === "tcgplayer");
   const pricechartingListings = data.prices.filter((p) => p.source === "pricecharting");
 
+  const cardData = {
+    cardId: data.cardId,
+    name: data.cardName,
+    setName: data.setName,
+    number: data.cardNumber,
+    rarity: data.rarity,
+    price: data.superGuess.estimate,
+    imageUrl: data.imageUrl,
+    tcgplayerUrl: tcgplayerUrl,
+    pricechartingUrl: pricechartingUrl,
+  };
+
   function handleCopy() {
-    copyCardToClipboard({
-      cardId: data.cardId,
-      name: data.cardName,
-      setName: data.setName,
-      number: data.cardNumber,
-      rarity: data.rarity,
-      price: data.superGuess.estimate,
-      imageUrl: data.imageUrl,
-    });
+    copyCardToClipboard(cardData);
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 1500);
   }
 
   function handleTrack() {
-    addTrackedCard({
-      cardId: data.cardId,
-      name: data.cardName,
-      setName: data.setName,
-      number: data.cardNumber,
-      rarity: data.rarity,
-      price: data.superGuess.estimate,
-      imageUrl: data.imageUrl,
-    });
+    addTrackedCard(cardData);
     setTrackFeedback(true);
     setTimeout(() => setTrackFeedback(false), 1500);
   }

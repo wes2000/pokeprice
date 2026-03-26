@@ -11,6 +11,8 @@ export interface TrackedCard {
   rarity: string;
   price: number;
   imageUrl: string;
+  tcgplayerUrl?: string;
+  pricechartingUrl?: string;
 }
 
 const STORAGE_KEY = "pokeprice-tracker";
@@ -26,8 +28,23 @@ export function addTrackedCard(card: TrackedCard) {
   } catch {}
 }
 
+function todayDate(): string {
+  const d = new Date();
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
 export function formatCardRow(card: TrackedCard): string {
-  return `${card.setName}\t${card.name}\t$${card.price.toFixed(2)}\t${card.name} - ${card.number}\t${card.rarity}`;
+  return [
+    card.setName,
+    card.name,
+    todayDate(),
+    `$${card.price.toFixed(2)}`,
+    "",
+    `${card.name} - ${card.number}`,
+    card.rarity,
+    card.tcgplayerUrl || "",
+    card.pricechartingUrl || "",
+  ].join("\t");
 }
 
 export function copyCardToClipboard(card: TrackedCard) {
@@ -65,7 +82,7 @@ export default function CardTracker({ onCardClick }: CardTrackerProps) {
   const total = cards.reduce((sum, c) => sum + c.price, 0);
 
   function handleExport() {
-    const header = "Set\tCard Name\tPrice\tFull Name\tRarity";
+    const header = "Set\tCard Name\tDate\tPrice\t\tFull Name\tRarity\tTCGPlayer Link\tPriceCharting Link";
     const rows = cards.map(formatCardRow);
     const text = [header, ...rows].join("\n");
     navigator.clipboard.writeText(text);
