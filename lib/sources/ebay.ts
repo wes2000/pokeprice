@@ -9,7 +9,10 @@ let cachedToken: { token: string; expiresAt: number } | null = null;
 async function getAccessToken(): Promise<string | null> {
   const clientId = process.env.EBAY_CLIENT_ID;
   const clientSecret = process.env.EBAY_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
+  if (!clientId || !clientSecret) {
+    console.warn("[eBay] Missing EBAY_CLIENT_ID or EBAY_CLIENT_SECRET");
+    return null;
+  }
 
   if (cachedToken && Date.now() < cachedToken.expiresAt) {
     return cachedToken.token;
@@ -22,10 +25,14 @@ async function getAccessToken(): Promise<string | null> {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: "grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope",
+    body: "grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope/buy.browse",
   });
 
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`[eBay] Auth failed: ${res.status} ${res.statusText}`, body);
+    return null;
+  }
 
   const data = await res.json();
   cachedToken = {
@@ -66,13 +73,19 @@ export async function fetchEbayPrices(
     clearTimeout(timeout);
 
     if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[eBay] Search failed: ${res.status}`, body);
       if (res.status === 401) cachedToken = null;
       return [];
     }
 
     const data = await res.json();
-    if (!data.itemSummaries) return [];
+    if (!data.itemSummaries) {
+      console.warn(`[eBay] No results for query: "${query}"`);
+      return [];
+    }
 
+    console.log(`[eBay] Found ${data.itemSummaries.length} listings for "${query}"`);
     // Browse API returns active listings, not sold — type as "listed" (weight 0.5)
     return data.itemSummaries.map((item: Record<string, unknown>) => ({
       source: "ebay" as const,
@@ -82,7 +95,8 @@ export async function fetchEbayPrices(
       type: "listed" as const,
       url: item.itemWebUrl as string,
     }));
-  } catch {
+  } catch (err) {
+    console.error("[eBay] Unexpected error:", err);
     return [];
   }
 }

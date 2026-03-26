@@ -12,6 +12,11 @@ interface CardResultProps {
 }
 
 export default function CardResult({ data, onRefresh, refreshing }: CardResultProps) {
+  // Extract first URL for each source from price entries
+  const ebayUrl = data.prices.find((p) => p.source === "ebay")?.url;
+  const tcgplayerUrl = data.prices.find((p) => p.source === "tcgplayer")?.url;
+  const pricechartingUrl = data.prices.find((p) => p.source === "pricecharting")?.url;
+
   return (
     <div className="result">
       <img className="result__image" src={data.imageUrl} alt={data.cardName} />
@@ -23,6 +28,7 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
             name="eBay Listings"
             meta={`${data.sources.ebay.count} listings, last ${data.sources.ebay.recentDays} days`}
             price={`$${data.sources.ebay.avg.toFixed(2)} avg ($${data.sources.ebay.low.toFixed(2)} – $${data.sources.ebay.high.toFixed(2)})`}
+            url={ebayUrl}
           />
         )}
 
@@ -31,6 +37,7 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
             name="TCGplayer"
             meta="Market price"
             price={`$${data.sources.tcgplayer.market.toFixed(2)} ($${data.sources.tcgplayer.low.toFixed(2)} – $${data.sources.tcgplayer.high.toFixed(2)})`}
+            url={tcgplayerUrl}
           />
         )}
 
@@ -43,6 +50,7 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
                 ? `$${data.sources.pricecharting.ungraded.toFixed(2)} / $${data.sources.pricecharting.complete.toFixed(2)}`
                 : `$${data.sources.pricecharting.ungraded.toFixed(2)}`
             }
+            url={pricechartingUrl}
           />
         )}
 

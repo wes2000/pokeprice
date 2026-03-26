@@ -1,11 +1,7 @@
 import { PriceEntry } from "../types";
 
-const BASE_URL = "https://www.pricecharting.com/game/pokemon";
+const SEARCH_URL = "https://www.pricecharting.com/search-products";
 const TIMEOUT_MS = 5000;
-
-function slugify(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
 
 function extractPrice(html: string, id: string): number | null {
   const regex = new RegExp(
@@ -17,24 +13,40 @@ function extractPrice(html: string, id: string): number | null {
   return parseFloat(match[1].replace(",", ""));
 }
 
+function extractCanonicalUrl(html: string): string | null {
+  const match = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i);
+  return match ? match[1] : null;
+}
+
 export async function fetchPriceChartingPrices(
   cardName: string,
   setName: string
 ): Promise<PriceEntry[]> {
+  if (!cardName) return [];
+
   try {
-    const slug = slugify(`${cardName} ${setName}`);
+    // Use PriceCharting's search to find the correct page
+    const query = `${cardName} ${setName}`.trim();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-    const res = await fetch(`${BASE_URL}/${slug}`, {
+    const searchParams = new URLSearchParams({
+      q: query,
+      type: "prices",
+      category: "pokemon-cards",
+    });
+
+    const res = await fetch(`${SEARCH_URL}?${searchParams}`, {
       headers: { "User-Agent": "PokePriceDashboard/1.0" },
       signal: controller.signal,
+      redirect: "follow",
     });
     clearTimeout(timeout);
 
     if (!res.ok) return [];
 
     const html = await res.text();
+    const pageUrl = extractCanonicalUrl(html) || res.url;
     const entries: PriceEntry[] = [];
     const now = new Date().toISOString();
 
@@ -46,7 +58,7 @@ export async function fetchPriceChartingPrices(
         condition: "Ungraded",
         date: now,
         type: "market",
-        url: `${BASE_URL}/${slug}`,
+        url: pageUrl,
       });
     }
 
@@ -58,7 +70,7 @@ export async function fetchPriceChartingPrices(
         condition: "Complete",
         date: now,
         type: "market",
-        url: `${BASE_URL}/${slug}`,
+        url: pageUrl,
       });
     }
 
