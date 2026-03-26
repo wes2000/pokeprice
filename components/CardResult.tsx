@@ -17,6 +17,9 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
   const tcgplayerUrl = data.prices.find((p) => p.source === "tcgplayer")?.url;
   const pricechartingUrl = data.prices.find((p) => p.source === "pricecharting")?.url;
 
+  // Get eBay listings for expandable view
+  const ebayListings = data.prices.filter((p) => p.source === "ebay");
+
   return (
     <div className="result">
       <img className="result__image" src={data.imageUrl} alt={data.cardName} />
@@ -29,6 +32,7 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
             meta={`${data.sources.ebay.count} listings, last ${data.sources.ebay.recentDays} days`}
             price={`$${data.sources.ebay.avg.toFixed(2)} avg ($${data.sources.ebay.low.toFixed(2)} – $${data.sources.ebay.high.toFixed(2)})`}
             url={ebayUrl}
+            listings={ebayListings}
           />
         )}
 
