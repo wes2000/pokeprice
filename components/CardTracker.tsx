@@ -38,7 +38,7 @@ export function formatCardRow(card: TrackedCard): string {
     card.name,
     todayDate(),
     `$${card.price.toFixed(2)}`,
-    "",
+    `=IMAGE("${card.imageUrl}")`,
     `${card.name} - ${card.number}`,
     card.rarity,
     card.tcgplayerUrl ? `=HYPERLINK("${card.tcgplayerUrl}","TCGPlayer Link")` : "",
@@ -81,9 +81,8 @@ export default function CardTracker({ onCardClick }: CardTrackerProps) {
   const total = cards.reduce((sum, c) => sum + c.price, 0);
 
   function handleExport() {
-    const header = "Set\tCard Name\tDate\tPrice\t\tFull Name\tRarity\tTCGPlayer Link\tPriceCharting Link";
     const rows = cards.map(formatCardRow);
-    const text = [header, ...rows].join("\n");
+    const text = rows.join("\n");
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -180,7 +179,7 @@ export default function CardTracker({ onCardClick }: CardTrackerProps) {
       {hoverCard && (
         <div
           className="tracker__hover-preview"
-          style={{ top: hoverPos.y - 220, left: hoverPos.x - 160 }}
+          style={{ top: hoverPos.y < 240 ? hoverPos.y + 30 : hoverPos.y - 220, left: hoverPos.x - 160 }}
         >
           <img src={hoverCard.imageUrl} alt={hoverCard.name} />
         </div>
