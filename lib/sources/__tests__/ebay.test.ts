@@ -1,4 +1,4 @@
-import { fetchEbayPrices } from "../ebay";
+import { fetchEbayPrices, resetTokenCache } from "../ebay";
 
 global.fetch = jest.fn();
 
@@ -32,6 +32,7 @@ const mockSearchResponse = {
 describe("fetchEbayPrices", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    resetTokenCache();
     process.env.EBAY_CLIENT_ID = "test-id";
     process.env.EBAY_CLIENT_SECRET = "test-secret";
   });
