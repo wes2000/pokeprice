@@ -1,10 +1,12 @@
 // components/CardResult.tsx
 "use client";
 
+import { useState } from "react";
 import { PriceResult } from "@/lib/types";
 import SuperGuess from "./SuperGuess";
 import PriceSource from "./PriceSource";
 import PriceChart from "./PriceChart";
+import { addTrackedCard, copyCardToClipboard } from "./CardTracker";
 
 interface CardResultProps {
   data: PriceResult;
@@ -13,6 +15,9 @@ interface CardResultProps {
 }
 
 export default function CardResult({ data, onRefresh, refreshing }: CardResultProps) {
+  const [copyFeedback, setCopyFeedback] = useState(false);
+  const [trackFeedback, setTrackFeedback] = useState(false);
+
   const ebayUrl = data.prices.find((p) => p.source === "ebay")?.url;
   const tcgplayerUrl = data.prices.find((p) => p.source === "tcgplayer")?.url;
   const pricechartingUrl = data.prices.find((p) => p.source === "pricecharting")?.url;
@@ -21,6 +26,34 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
   const tcgplayerListings = data.prices.filter((p) => p.source === "tcgplayer");
   const pricechartingListings = data.prices.filter((p) => p.source === "pricecharting");
 
+  function handleCopy() {
+    copyCardToClipboard({
+      cardId: data.cardId,
+      name: data.cardName,
+      setName: data.setName,
+      number: data.cardNumber,
+      rarity: data.rarity,
+      price: data.superGuess.estimate,
+      imageUrl: data.imageUrl,
+    });
+    setCopyFeedback(true);
+    setTimeout(() => setCopyFeedback(false), 1500);
+  }
+
+  function handleTrack() {
+    addTrackedCard({
+      cardId: data.cardId,
+      name: data.cardName,
+      setName: data.setName,
+      number: data.cardNumber,
+      rarity: data.rarity,
+      price: data.superGuess.estimate,
+      imageUrl: data.imageUrl,
+    });
+    setTrackFeedback(true);
+    setTimeout(() => setTrackFeedback(false), 1500);
+  }
+
   return (
     <div className="result-wrapper">
       <div className="result-heading">
@@ -28,7 +61,17 @@ export default function CardResult({ data, onRefresh, refreshing }: CardResultPr
         <div className="result-heading__meta">{data.setName} · {data.cardNumber} · {data.rarity}</div>
       </div>
       <div className="result">
-        <img className="result__image" src={data.imageUrl} alt={data.cardName} />
+        <div className="result__left">
+          <img className="result__image" src={data.imageUrl} alt={data.cardName} />
+          <div className="result__card-actions">
+            <button className="result__action-btn" onClick={handleCopy}>
+              {copyFeedback ? "Copied!" : "Copy"}
+            </button>
+            <button className="result__action-btn result__action-btn--track" onClick={handleTrack}>
+              {trackFeedback ? "Added!" : "+ Track"}
+            </button>
+          </div>
+        </div>
         <div className="result__prices">
           <SuperGuess data={data.superGuess} onRefresh={onRefresh} refreshing={refreshing} />
 
